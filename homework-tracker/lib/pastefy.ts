@@ -100,6 +100,8 @@ export const PastefyService = {
     
     console.log(`Switching from ${currentActiveIndex === 0 ? 'paste1' : 'paste2'} to ${newActiveIndex === 0 ? 'paste1' : 'paste2'}`);
     
+    let saveSuccess = false;
+    
     try {
       // Try to update the new active paste using PUT (update entire paste)
       try {
@@ -112,39 +114,73 @@ export const PastefyService = {
           }),
         });
         console.log(`Successfully saved to ${newActiveIndex === 0 ? 'paste1' : 'paste2'}:`, response);
+        saveSuccess = true;
       } catch (putError) {
-        console.error(`PUT failed for ${newActiveIndex === 0 ? 'paste1' : 'paste2'}, trying POST:`, putError);
+        console.error(`PUT failed for ${newActiveIndex === 0 ? 'paste1' : 'paste2'} (${putError}), trying POST:`, putError);
         // If PUT fails, try POST to create a new paste
-        const newPaste = await pastefyRequest('/paste', {
-          method: 'POST',
-          body: JSON.stringify({
-            title: `${user}-assignments`,
-            content,
-            visibility: 'private'
-          }),
-        });
-        console.log(`Created new paste with ID: ${newPaste.id}`);
-        // Update the paste ID in our configuration
-        if (newActiveIndex === 0) {
-          userPastes.paste1 = newPaste.id;
-        } else {
-          userPastes.paste2 = newPaste.id;
+        try {
+          const newPaste = await pastefyRequest('/paste', {
+            method: 'POST',
+            body: JSON.stringify({
+              title: `${user}-assignments`,
+              content,
+              visibility: 'private'
+            }),
+          });
+          console.log(`Created new paste with ID: ${newPaste.id}`);
+          // Update the paste ID in our configuration
+          if (newActiveIndex === 0) {
+            userPastes.paste1 = newPaste.id;
+          } else {
+            userPastes.paste2 = newPaste.id;
+          }
+          saveSuccess = true;
+        } catch (postError) {
+          console.error(`POST also failed:`, postError);
         }
       }
       
-      // Also try to sync the old paste
-      try {
-        await pastefyRequest(`/paste/${currentPasteId}`, {
-          method: 'PUT',
-          body: JSON.stringify({ 
-            title: `${user}-assignments`,
-            content,
-            visibility: 'private'
-          }),
-        });
-        console.log(`Successfully synced to ${currentActiveIndex === 0 ? 'paste1' : 'paste2'}`);
-      } catch (syncError) {
-        console.error(`Failed to sync to ${currentActiveIndex === 0 ? 'paste1' : 'paste2'}:`, syncError);
+      // If the new paste save failed, try to save to the current paste instead
+      if (!saveSuccess) {
+        console.log(`Trying to save to current paste ${currentActiveIndex === 0 ? 'paste1' : 'paste2'} as fallback`);
+        try {
+          await pastefyRequest(`/paste/${currentPasteId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+              title: `${user}-assignments`,
+              content,
+              visibility: 'private'
+            }),
+          });
+          console.log(`Successfully saved to fallback ${currentActiveIndex === 0 ? 'paste1' : 'paste2'}`);
+          saveSuccess = true;
+          // Don't toggle the index since we saved to the current paste
+          ACTIVE_PASTE_INDEX[user] = currentActiveIndex;
+        } catch (fallbackError) {
+          console.error(`Fallback save also failed:`, fallbackError);
+        }
+      }
+      
+      // Also try to sync the old paste if the main save succeeded
+      if (saveSuccess) {
+        try {
+          await pastefyRequest(`/paste/${currentPasteId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+              title: `${user}-assignments`,
+              content,
+              visibility: 'private'
+            }),
+          });
+          console.log(`Successfully synced to ${currentActiveIndex === 0 ? 'paste1' : 'paste2'}`);
+        } catch (syncError) {
+          console.error(`Failed to sync to ${currentActiveIndex === 0 ? 'paste1' : 'paste2'}:`, syncError);
+          // Don't throw error if sync fails, as long as main save succeeded
+        }
+      }
+      
+      if (!saveSuccess) {
+        throw new Error('Failed to save data to Pastefy API. The service may be experiencing issues. Please try again later.');
       }
     } catch (error) {
       console.error('Failed to save paste:', error);
