@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Assignment } from '@/types';
+import { SUBJECTS } from '@/constants/subjects';
 import { X, Save } from 'lucide-react';
 
 interface AssignmentFormProps {
@@ -16,6 +17,7 @@ export default function AssignmentForm({ assignment, onSave, onCancel }: Assignm
   const [imageUrl, setImageUrl] = useState(assignment?.imageUrl || '');
   const [linkUrl, setLinkUrl] = useState(assignment?.linkUrl || '');
   const [completed, setCompleted] = useState(assignment?.completed || false);
+  const [subject, setSubject] = useState(assignment?.subject || SUBJECTS[0]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +28,7 @@ export default function AssignmentForm({ assignment, onSave, onCancel }: Assignm
       description: description.trim(),
       imageUrl: imageUrl.trim(),
       linkUrl: linkUrl.trim(),
+      subject,
       completed,
     });
   };
@@ -58,6 +61,24 @@ export default function AssignmentForm({ assignment, onSave, onCancel }: Assignm
               placeholder="Enter assignment title"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Subject *
+            </label>
+            <select
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
+              {SUBJECTS.map((sub) => (
+                <option key={sub} value={sub}>
+                  {sub}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

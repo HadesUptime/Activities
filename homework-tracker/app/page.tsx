@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { User, Assignment, UserData } from '@/types';
 import { PastefyService } from '@/lib/pastefy';
 import UserSelector from '@/components/UserSelector';
+import SubjectSelector from '@/components/SubjectSelector';
 import AssignmentList from '@/components/AssignmentList';
 import AssignmentForm from '@/components/AssignmentForm';
 import { Plus, BookOpen, Loader2 } from 'lucide-react';
@@ -15,6 +16,7 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | undefined>();
   const [error, setError] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
 
   const loadUserData = async () => {
     setLoading(true);
@@ -81,41 +83,54 @@ export default function Home() {
     setEditingAssignment(assignment);
   };
 
-  const completedCount = userData?.assignments.filter(a => a.completed).length || 0;
-  const totalCount = userData?.assignments.length || 0;
+  const filteredAssignments = selectedSubject
+    ? userData?.assignments.filter((a: Assignment) => a.subject === selectedSubject) || []
+    : userData?.assignments || [];
+
+  const completedCount = filteredAssignments.filter(a => a.completed).length || 0;
+  const totalCount = filteredAssignments.length || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-8 px-4">
-      <div className="max-w-3xl mx-auto">
-        <header className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <BookOpen size={32} className="text-blue-600" />
-            <h1 className="text-4xl font-bold text-gray-900">Homework Tracker</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <header className="text-center mb-10">
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-2xl shadow-lg">
+              <BookOpen size={36} className="text-white" />
+            </div>
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Homework Tracker
+            </h1>
           </div>
-          <p className="text-gray-600">Track your assignments and stay organized</p>
+          <p className="text-gray-600 text-lg">Track your assignments and stay organized</p>
         </header>
 
         <UserSelector currentUser={currentUser} onUserChange={setCurrentUser} />
 
+        <SubjectSelector 
+          selectedSubject={selectedSubject} 
+          onSubjectChange={setSelectedSubject} 
+        />
+
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 shadow-md">
             {error}
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+          <div className="flex justify-between items-center mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-3xl font-bold text-gray-900">
                 {userData?.name || currentUser === 'dindin' ? 'Dindin' : 'Bebi Elai'}'s Assignments
               </h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 mt-1">
                 {completedCount} of {totalCount} completed
               </p>
             </div>
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-md"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
             >
               <Plus size={20} />
               Add Assignment
@@ -123,12 +138,12 @@ export default function Home() {
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 size={32} className="animate-spin text-blue-500" />
+            <div className="flex justify-center py-16">
+              <Loader2 size={40} className="animate-spin text-blue-500" />
             </div>
           ) : (
             <AssignmentList
-              assignments={userData?.assignments || []}
+              assignments={filteredAssignments}
               onToggleComplete={handleToggleComplete}
               onDelete={handleDeleteAssignment}
               onEdit={handleEditClick}

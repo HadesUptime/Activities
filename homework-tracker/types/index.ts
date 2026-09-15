@@ -5,6 +5,7 @@ export interface Assignment {
   completed: boolean;
   imageUrl?: string;
   linkUrl?: string;
+  subject: string;
   createdAt: string;
   updatedAt: string;
 }
