@@ -51,7 +51,18 @@ export const PastefyService = {
       console.log(`Reading from ${activeIndex === 0 ? 'paste1' : 'paste2'} (${pasteId}) for user ${user}`);
       
       const paste: PastefyPaste = await pastefyRequest(`/paste/${pasteId}`);
-      const userData: UserData = JSON.parse(paste.content);
+      
+      // Try to parse JSON, handle invalid JSON gracefully
+      let userData: UserData;
+      try {
+        userData = JSON.parse(paste.content);
+      } catch (parseError) {
+        console.error('Invalid JSON in paste, returning empty data:', parseError);
+        return {
+          name: user === 'dindin' ? 'Dindin' : 'Bebi Elai',
+          assignments: []
+        };
+      }
       
       // Migrate existing assignments to include subject field
       userData.assignments = userData.assignments.map((assignment: Assignment) => ({
@@ -85,18 +96,46 @@ export const PastefyService = {
     console.log(`Switching from ${currentActiveIndex === 0 ? 'paste1' : 'paste2'} to ${newActiveIndex === 0 ? 'paste1' : 'paste2'}`);
     
     try {
-      // Save to the new active paste
-      const response = await pastefyRequest(`/paste/${newPasteId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ content }),
-      });
-      console.log(`Successfully saved to ${newActiveIndex === 0 ? 'paste1' : 'paste2'}:`, response);
+      // Try to update the new active paste using PUT (update entire paste)
+      try {
+        const response = await pastefyRequest(`/paste/${newPasteId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ 
+            title: `${user}-assignments`,
+            content,
+            visibility: 'private'
+          }),
+        });
+        console.log(`Successfully saved to ${newActiveIndex === 0 ? 'paste1' : 'paste2'}:`, response);
+      } catch (putError) {
+        console.error(`PUT failed for ${newActiveIndex === 0 ? 'paste1' : 'paste2'}, trying POST:`, putError);
+        // If PUT fails, try POST to create a new paste
+        const newPaste = await pastefyRequest('/paste', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: `${user}-assignments`,
+            content,
+            visibility: 'private'
+          }),
+        });
+        console.log(`Created new paste with ID: ${newPaste.id}`);
+        // Update the paste ID in our configuration
+        if (newActiveIndex === 0) {
+          userPastes.paste1 = newPaste.id;
+        } else {
+          userPastes.paste2 = newPaste.id;
+        }
+      }
       
-      // Also update the old paste to keep them in sync
+      // Also try to sync the old paste
       try {
         await pastefyRequest(`/paste/${currentPasteId}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ content }),
+          method: 'PUT',
+          body: JSON.stringify({ 
+            title: `${user}-assignments`,
+            content,
+            visibility: 'private'
+          }),
         });
         console.log(`Successfully synced to ${currentActiveIndex === 0 ? 'paste1' : 'paste2'}`);
       } catch (syncError) {
