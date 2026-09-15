@@ -5,8 +5,20 @@ const PASTEFY_API_BASE = 'https://pastefy.app/api/v2';
 const API_KEY = 'SU51czLG80VpbMBUGevRgSUVx1lIEZGt5Oe6qjhVktIaXx94moESHANBJL26';
 
 const PASTE_IDS = {
-  'dindin': 'X5QPvOhB',
-  'bebi-elai': 'p6XgH41m'
+  'dindin': {
+    paste1: 'X5QPvOhB',
+    paste2: 'EeBYhflX'
+  },
+  'bebi-elai': {
+    paste1: 'p6XgH41m',
+    paste2: 'k2wfVRsi'
+  }
+};
+
+// Track which paste is currently active for each user
+const ACTIVE_PASTE_INDEX: Record<string, number> = {
+  'dindin': 0,
+  'bebi-elai': 0
 };
 
 async function pastefyRequest(endpoint: string, options: RequestInit = {}) {
@@ -32,7 +44,13 @@ async function pastefyRequest(endpoint: string, options: RequestInit = {}) {
 export const PastefyService = {
   async getUserData(user: string): Promise<UserData> {
     try {
-      const paste: PastefyPaste = await pastefyRequest(`/paste/${PASTE_IDS[user as keyof typeof PASTE_IDS]}`);
+      const userPastes = PASTE_IDS[user as keyof typeof PASTE_IDS] as { paste1: string; paste2: string };
+      const activeIndex = ACTIVE_PASTE_INDEX[user] || 0;
+      const pasteId = activeIndex === 0 ? userPastes.paste1 : userPastes.paste2;
+      
+      console.log(`Reading from ${activeIndex === 0 ? 'paste1' : 'paste2'} (${pasteId}) for user ${user}`);
+      
+      const paste: PastefyPaste = await pastefyRequest(`/paste/${pasteId}`);
       const userData: UserData = JSON.parse(paste.content);
       
       // Migrate existing assignments to include subject field
@@ -44,6 +62,7 @@ export const PastefyService = {
       return userData;
     } catch (error) {
       // If paste doesn't exist, return empty user data
+      console.error('Error reading paste:', error);
       return {
         name: user === 'dindin' ? 'Dindin' : 'Bebi Elai',
         assignments: []
@@ -53,26 +72,39 @@ export const PastefyService = {
 
   async saveUserData(user: string, userData: UserData): Promise<void> {
     const content = JSON.stringify(userData, null, 2);
+    const userPastes = PASTE_IDS[user as keyof typeof PASTE_IDS] as { paste1: string; paste2: string };
+    
+    // Toggle the active paste index
+    const currentActiveIndex = ACTIVE_PASTE_INDEX[user] || 0;
+    const newActiveIndex = currentActiveIndex === 0 ? 1 : 0;
+    ACTIVE_PASTE_INDEX[user] = newActiveIndex;
+    
+    const currentPasteId = currentActiveIndex === 0 ? userPastes.paste1 : userPastes.paste2;
+    const newPasteId = newActiveIndex === 0 ? userPastes.paste1 : userPastes.paste2;
+    
+    console.log(`Switching from ${currentActiveIndex === 0 ? 'paste1' : 'paste2'} to ${newActiveIndex === 0 ? 'paste1' : 'paste2'}`);
     
     try {
-      // Try to update existing paste
-      const response = await pastefyRequest(`/paste/${PASTE_IDS[user as keyof typeof PASTE_IDS]}`, {
+      // Save to the new active paste
+      const response = await pastefyRequest(`/paste/${newPasteId}`, {
         method: 'PATCH',
         body: JSON.stringify({ content }),
       });
-      console.log('Paste updated successfully:', response);
+      console.log(`Successfully saved to ${newActiveIndex === 0 ? 'paste1' : 'paste2'}:`, response);
+      
+      // Also update the old paste to keep them in sync
+      try {
+        await pastefyRequest(`/paste/${currentPasteId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ content }),
+        });
+        console.log(`Successfully synced to ${currentActiveIndex === 0 ? 'paste1' : 'paste2'}`);
+      } catch (syncError) {
+        console.error(`Failed to sync to ${currentActiveIndex === 0 ? 'paste1' : 'paste2'}:`, syncError);
+      }
     } catch (error) {
-      console.error('Failed to update paste, creating new one:', error);
-      // If paste doesn't exist, create new one
-      const newPaste = await pastefyRequest('/paste', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: `${user}-assignments`,
-          content,
-        }),
-      });
-      // Store the new paste ID (you'll need to update PASTE_IDS)
-      console.log('Created new paste with ID:', newPaste.id);
+      console.error('Failed to save paste:', error);
+      throw error;
     }
   },
 
