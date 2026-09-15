@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: homework-tracker
+    env: node
+    rootDirectory: homework-tracker
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    nodeVersion: 18
+    plan: free
+    envVars:
+      - key: NEXT_PUBLIC_PASTEFY_API_KEY
+        value: SU51czLG80VpbMBUGevRgSUVx1lIEZGt5Oe6qjhVktIaXx94moESHANBJL26
