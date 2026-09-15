@@ -1,4 +1,5 @@
 import { Assignment, UserData, PastefyPaste } from '@/types';
+import { SUBJECTS } from '@/constants/subjects';
 
 const PASTEFY_API_BASE = 'https://pastefy.app/api/v2';
 const API_KEY = 'SU51czLG80VpbMBUGevRgSUVx1lIEZGt5Oe6qjhVktIaXx94moESHANBJL26';
@@ -33,6 +34,13 @@ export const PastefyService = {
     try {
       const paste: PastefyPaste = await pastefyRequest(`/paste/${PASTE_IDS[user as keyof typeof PASTE_IDS]}`);
       const userData: UserData = JSON.parse(paste.content);
+      
+      // Migrate existing assignments to include subject field
+      userData.assignments = userData.assignments.map((assignment: Assignment) => ({
+        ...assignment,
+        subject: assignment.subject || SUBJECTS[0] // Default to first subject if missing
+      }));
+      
       return userData;
     } catch (error) {
       // If paste doesn't exist, return empty user data
@@ -48,11 +56,13 @@ export const PastefyService = {
     
     try {
       // Try to update existing paste
-      await pastefyRequest(`/paste/${PASTE_IDS[user as keyof typeof PASTE_IDS]}`, {
+      const response = await pastefyRequest(`/paste/${PASTE_IDS[user as keyof typeof PASTE_IDS]}`, {
         method: 'PATCH',
         body: JSON.stringify({ content }),
       });
+      console.log('Paste updated successfully:', response);
     } catch (error) {
+      console.error('Failed to update paste, creating new one:', error);
       // If paste doesn't exist, create new one
       const newPaste = await pastefyRequest('/paste', {
         method: 'POST',
@@ -67,16 +77,27 @@ export const PastefyService = {
   },
 
   async addAssignment(user: string, assignment: Omit<Assignment, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserData> {
+    console.log('Adding assignment for user:', user, 'assignment:', assignment);
     const userData = await this.getUserData(user);
+    console.log('Current user data:', userData);
+    
     const newAssignment: Assignment = {
       ...assignment,
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    
     userData.assignments.push(newAssignment);
+    console.log('After push, assignments count:', userData.assignments.length);
+    
     await this.saveUserData(user, userData);
-    return userData;
+    
+    // Verify the save by reloading
+    const verifiedData = await this.getUserData(user);
+    console.log('Verified data after save:', verifiedData);
+    
+    return verifiedData;
   },
 
   async updateAssignment(user: string, assignmentId: string, updates: Partial<Assignment>): Promise<UserData> {
