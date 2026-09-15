@@ -3,8 +3,8 @@ services:
     name: homework-tracker
     env: node
     plan: free
-    buildCommand: cd homework-tracker && npm install && npm run build
-    startCommand: cd homework-tracker && npm start
+    buildCommand: npm install --prefix homework-tracker && npm run build --prefix homework-tracker
+    startCommand: npm start --prefix homework-tracker
     nodeVersion: 18
     envVars:
       - key: NEXT_PUBLIC_PASTEFY_API_KEY
