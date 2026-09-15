@@ -64,6 +64,11 @@ export const PastefyService = {
         };
       }
       
+      // Ensure assignments array exists
+      if (!userData.assignments || !Array.isArray(userData.assignments)) {
+        userData.assignments = [];
+      }
+      
       // Migrate existing assignments to include subject field
       userData.assignments = userData.assignments.map((assignment: Assignment) => ({
         ...assignment,
